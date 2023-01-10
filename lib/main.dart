@@ -1,7 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:location/location.dart';
 
 void main() {
   runApp(const MyApp());
+}
+
+var location;
+
+Future<bool> setupLocation() async {
+  location ??= Location();
+  location.enableBackgroundMode(enable: true);
+
+  var serviceEnabled = await location!.serviceEnabled();
+  if (!serviceEnabled) {
+    serviceEnabled = await location!.requestService();
+    if (!serviceEnabled) {
+      return false;
+    }
+  }
+
+  var permissionGranted = await location!.hasPermission();
+  if (permissionGranted == PermissionStatus.denied) {
+    permissionGranted = await location!.requestPermission();
+    if (permissionGranted != PermissionStatus.granted) {
+      return false;
+    }
+  }
+  return true;
 }
 
 class MyApp extends StatelessWidget {
@@ -48,17 +73,17 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  final int _counter = 0;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  @override
+  void initState() async {
+    await setupLocation();
+    super.initState();
+  }
+
+  void _incrementCounter() async {
+    LocationData locationData = await location.getLocation();
+    print(locationData);
   }
 
   @override
