@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:location/location.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 void main() {
   runApp(const MyApp());
@@ -8,6 +10,8 @@ void main() {
 
 var location;
 var timer;
+
+const int frequencyTimer = 5;
 
 Future<bool> setupLocation() async {
   location ??= Location();
@@ -29,6 +33,20 @@ Future<bool> setupLocation() async {
     }
   }
   return true;
+}
+
+IO.Socket connectSocket() {
+  IO.Socket socket = IO.io('http://10.0.2.2:8080', <String, dynamic>{
+    'transports': ['websocket'],
+    'autoConnect': true,
+  });
+  socket.onConnect((_) {
+    debugPrint('connect');
+  });
+  socket.onDisconnect((_) => debugPrint('disconnect'));
+  socket.onError((data) => {debugPrint(data)});
+  socket.on('fromServer', (_) => debugPrint(_));
+  return socket;
 }
 
 class MyApp extends StatelessWidget {
@@ -56,23 +74,41 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final int _counter = 0;
+  late IO.Socket socket;
+  String _mobileNumber = '';
+  bool _saved = false;
+  bool _isWorking = false;
 
   @override
   void initState() {
     setupLocation();
+    socket = connectSocket();
     super.initState();
   }
 
   _stopSendingLocation() {
     timer.cancel();
+    setState(() => _isWorking = false);
   }
 
-  _startSendingLocation() async {
-    timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+  _startSendingLocation(IO.Socket socket) async {
+    if (_isWorking) {
+      return;
+    }
+    timer =
+        Timer.periodic(const Duration(seconds: frequencyTimer), (timer) async {
       LocationData locationData = await location.getLocation();
+      socket.emit(
+          'newLocationObject',
+          jsonEncode({
+            "phone": _mobileNumber,
+            "timestamp": DateTime.now().microsecondsSinceEpoch,
+            "lat": locationData.latitude,
+            "lng": locationData.longitude,
+          }));
       debugPrint(locationData.toString());
     });
+    setState(() => _isWorking = true);
   }
 
   @override
@@ -85,33 +121,32 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+            Text(_isWorking
+                ? "Working Right Now"
+                : "Press Start to start working"),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+              child: TextFormField(
+                onChanged: (value) => {_mobileNumber = value},
+                enabled: !_saved,
+                decoration: const InputDecoration(
+                  border: UnderlineInputBorder(),
+                  labelText: 'Phone Number',
+                ),
+              ),
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
+            TextButton(
+                onPressed: () => {setState(() => _saved = !_saved)},
+                child: Text(_saved ? "Edit" : "Save"))
           ],
         ),
       ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            onPressed: _startSendingLocation,
-            tooltip: 'Send Location',
-            child: const Icon(Icons.start),
-          ),
-          const SizedBox(
-            height: 10,
-          ),
-          FloatingActionButton(
-            onPressed: _stopSendingLocation,
-            tooltip: 'Stop Location',
-            child: const Icon(Icons.stop),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: _isWorking
+            ? _stopSendingLocation
+            : () => _startSendingLocation(socket),
+        tooltip: 'Send Location',
+        child: Icon(_isWorking ? Icons.stop : Icons.play_arrow),
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
