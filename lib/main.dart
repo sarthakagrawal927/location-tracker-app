@@ -35,20 +35,6 @@ Future<bool> setupLocation() async {
   return true;
 }
 
-IO.Socket connectSocket() {
-  IO.Socket socket = IO.io('http://10.0.2.2:8080', <String, dynamic>{
-    'transports': ['websocket'],
-    'autoConnect': true,
-  });
-  socket.onConnect((_) {
-    debugPrint('connect');
-  });
-  socket.onDisconnect((_) => debugPrint('disconnect'));
-  socket.onError((data) => {debugPrint(data)});
-  socket.on('fromServer', (_) => debugPrint(_));
-  return socket;
-}
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -78,6 +64,24 @@ class _MyHomePageState extends State<MyHomePage> {
   String _mobileNumber = '';
   bool _saved = false;
   bool _isWorking = false;
+  bool _isConnected = false;
+
+  IO.Socket connectSocket() {
+    IO.Socket socket = IO.io(
+        'https://smooth-plums-refuse-49-36-211-231.loca.lt', <String, dynamic>{
+      'transports': ['websocket'],
+      'headers':
+          "{'Content-Type': 'application/json', ' Bypass-Tunnel-Reminder': 'true'}",
+      'autoConnect': true,
+    });
+    socket.onConnect((_) {
+      setState(() => _isConnected = true);
+    });
+    socket.onDisconnect((_) => {setState(() => _isConnected = false)});
+    socket.onError((data) => {debugPrint(data)});
+    socket.on('fromServer', (_) => debugPrint(_));
+    return socket;
+  }
 
   @override
   void initState() {
@@ -94,6 +98,9 @@ class _MyHomePageState extends State<MyHomePage> {
   _startSendingLocation(IO.Socket socket) async {
     if (_isWorking) {
       return;
+    }
+    if (!_isConnected) {
+      socket = connectSocket();
     }
     timer =
         Timer.periodic(const Duration(seconds: frequencyTimer), (timer) async {
@@ -124,6 +131,7 @@ class _MyHomePageState extends State<MyHomePage> {
             Text(_isWorking
                 ? "Working Right Now"
                 : "Press Start to start working"),
+            Text(_isConnected ? "Connected" : "Not Connected"),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
               child: TextFormField(
