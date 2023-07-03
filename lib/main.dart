@@ -8,14 +8,14 @@ void main() {
   runApp(const MyApp());
 }
 
-var location;
-var timer;
+Location? location;
+Timer? timer;
 
 const int frequencyTimer = 5;
 
 Future<bool> setupLocation() async {
   location ??= Location();
-  location.enableBackgroundMode(enable: true);
+  location?.enableBackgroundMode(enable: true);
 
   var serviceEnabled = await location!.serviceEnabled();
   if (!serviceEnabled) {
@@ -67,8 +67,8 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isConnected = false;
 
   IO.Socket connectSocket() {
-    IO.Socket socket = IO.io(
-        'https://smooth-plums-refuse-49-36-211-231.loca.lt', <String, dynamic>{
+    IO.Socket socket =
+        IO.io('https://location-tracker-sr6p.onrender.com/', <String, dynamic>{
       'transports': ['websocket'],
       'headers':
           "{'Content-Type': 'application/json', ' Bypass-Tunnel-Reminder': 'true'}",
@@ -91,7 +91,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   _stopSendingLocation() {
-    timer.cancel();
+    timer!.cancel();
     setState(() => _isWorking = false);
   }
 
@@ -104,7 +104,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
     timer =
         Timer.periodic(const Duration(seconds: frequencyTimer), (timer) async {
-      LocationData locationData = await location.getLocation();
+      LocationData locationData = await location!.getLocation();
       socket.emit(
           'newLocationObject',
           jsonEncode({
